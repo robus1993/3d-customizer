@@ -65,8 +65,8 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(-0.2840329107436267, 1.4382243402279846, 10.275912849022538);
-        camera.rotation.set(0.00101810946737628, -0.021709860116203898, 0.00002210128553521455);
+        camera.position.set(-0.1490710322227728, 1.2241410589856285, 8.336312797208635);
+        camera.rotation.set(0.001018109467376266, -0.021709860116204037, 0.000022101285535214387);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -75,20 +75,6 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.setClearColor(0x000000, 0);
         container.appendChild(renderer.domElement);
-
-        // Create gradient background
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#495dff');
-        gradient.addColorStop(0.76, '#69b1ff');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.minFilter = THREE.LinearFilter;
-        scene.background = texture;
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -105,7 +91,7 @@
         // Add 3 customizable lights with baked params
         const lightSlots = [
             { params: { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: { x: 7.7, y: 3.8, z: -17.2 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } },
-            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 4.02, position: { x: -1.9, y: 3.3, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
+            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 5, position: { x: -1.9, y: 3.3, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
             { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: { x: 0, y: 5, z: -5 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } }
         ];
 
