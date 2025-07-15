@@ -72,19 +72,16 @@
         camera.position.set(-0.2840329107436267, 1.4382243402279846, 10.275912849022538);
         camera.rotation.set(0.00101810946737628, -0.021709860116203898, 0.00002210128553521455);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.setClearColor(0x000000, 0);
+        renderer.setClearColor('#f0f0f0', 1);
         container.appendChild(renderer.domElement);
 
         const composer = new EffectComposer(renderer);
-        composer.setSize(container.clientWidth, container.clientHeight);
-
         const renderPass = new RenderPass(scene, camera);
-        renderPass.clear = false; // To preserve transparency
         composer.addPass(renderPass);
 
         const bloomParams = {
@@ -97,6 +94,7 @@
         composer.addPass(bloomPass);
 
         const ssaoParams = {
+            enabled: true,
             kernelRadius: 16,
             minDistance: 0.005,
             maxDistance: 0.1,
@@ -107,6 +105,7 @@
         ssaoPass.minDistance = ssaoParams.minDistance;
         ssaoPass.maxDistance = ssaoParams.maxDistance;
         ssaoPass.intensity = ssaoParams.intensity;
+        ssaoPass.enabled = ssaoParams.enabled;
         composer.addPass(ssaoPass);
 
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -272,6 +271,7 @@
         bloomFolder.add(bloomParams, 'threshold', 0, 1, 0.01).onChange(v => bloomPass.threshold = v);
 
         const ssaoFolder = postFolder.addFolder('SSAO');
+        ssaoFolder.add(ssaoParams, 'enabled').onChange(v => ssaoPass.enabled = v);
         ssaoFolder.add(ssaoParams, 'kernelRadius', 0, 32, 0.1).onChange(v => ssaoPass.kernelRadius = v);
         ssaoFolder.add(ssaoParams, 'minDistance', 0, 0.1, 0.001).onChange(v => ssaoPass.minDistance = v);
         ssaoFolder.add(ssaoParams, 'maxDistance', 0, 0.2, 0.001).onChange(v => ssaoPass.maxDistance = v);
