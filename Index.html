@@ -57,6 +57,7 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
@@ -92,6 +93,17 @@
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), bloomParams.strength, bloomParams.radius, bloomParams.threshold);
         composer.addPass(bloomPass);
 
+        const ssaoParams = {
+            kernelRadius: 16,
+            minDistance: 0.005,
+            maxDistance: 0.1
+        };
+        const ssaoPass = new SSAOPass(scene, camera, container.clientWidth, container.clientHeight);
+        ssaoPass.kernelRadius = ssaoParams.kernelRadius;
+        ssaoPass.minDistance = ssaoParams.minDistance;
+        ssaoPass.maxDistance = ssaoParams.maxDistance;
+        composer.addPass(ssaoPass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -121,8 +133,8 @@
                 light.target = new THREE.Object3D();
                 light.castShadow = params.castShadow;
                 if (params.castShadow) {
-                    light.shadow.mapSize.width = 2048;
-                    light.shadow.mapSize.height = 2048;
+                    light.shadow.mapSize.width = 4096;
+                    light.shadow.mapSize.height = 4096;
                     light.shadow.camera.near = 0.1;
                     light.shadow.camera.far = 100;
                     light.shadow.camera.left = -20;
@@ -135,8 +147,8 @@
                 light = new THREE.PointLight(color, intensity, params.distance, params.decay);
                 light.castShadow = params.castShadow;
                 if (params.castShadow) {
-                    light.shadow.mapSize.width = 2048;
-                    light.shadow.mapSize.height = 2048;
+                    light.shadow.mapSize.width = 4096;
+                    light.shadow.mapSize.height = 4096;
                     light.shadow.camera.near = 0.1;
                     light.shadow.camera.far = 100;
                     light.shadow.bias = -0.0001;
@@ -254,6 +266,11 @@
         bloomFolder.add(bloomParams, 'radius', 0, 1, 0.01).onChange(v => bloomPass.radius = v);
         bloomFolder.add(bloomParams, 'threshold', 0, 1, 0.01).onChange(v => bloomPass.threshold = v);
 
+        const ssaoFolder = postFolder.addFolder('SSAO');
+        ssaoFolder.add(ssaoParams, 'kernelRadius', 0, 32, 0.1).onChange(v => ssaoPass.kernelRadius = v);
+        ssaoFolder.add(ssaoParams, 'minDistance', 0, 0.1, 0.001).onChange(v => ssaoPass.minDistance = v);
+        ssaoFolder.add(ssaoParams, 'maxDistance', 0, 0.2, 0.001).onChange(v => ssaoPass.maxDistance = v);
+
         // Model loading
         const glbUrl = './scene-optimized.glb'; // Assuming the GLB file is in the same directory as index.html on your Netlify site
         const loader = new GLTFLoader();
@@ -269,9 +286,9 @@
                 // Identify objects and enable shadows
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color27'].includes(child.name)) {
+                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color277'].includes(child.name)) {
                             primaryColorObjects.push(child);
-                        } else if (['Color21', 'Color25', 'Color27'].includes(child.name)) {
+                        } else if (['Color21', 'Color25', 'Color277'].includes(child.name)) {
                             secondaryColorObjects.push(child);
                         }
                         if (child.name.startsWith('Decal')) decalObjects.push(child);
