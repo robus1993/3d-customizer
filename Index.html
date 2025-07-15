@@ -51,6 +51,12 @@
         import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
@@ -61,8 +67,8 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(-0.14174618135894057, 2.1952267593971606, 10.254996729868925);
-        camera.rotation.set(-0.06287602690434883, -0.011933009173710245, -0.0007512725447900868);
+        camera.position.set(-0.28403291074362663, 1.4382243402279855, 10.275912849022538);
+        camera.rotation.set(0.0008972859317435898, -0.023913209016349662, 0.00002145494684692914);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -72,6 +78,39 @@
         renderer.setClearColor(0x000000, 0); // Transparent background
         container.appendChild(renderer.domElement);
 
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomParams = {
+            enabled: true,
+            strength: 1.5,
+            radius: 0.4,
+            threshold: 0.85
+        };
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), bloomParams.strength, bloomParams.radius, bloomParams.threshold);
+        composer.addPass(bloomPass);
+
+        const filmParams = {
+            enabled: true,
+            noiseIntensity: 0.35,
+            scanlinesIntensity: 0.025,
+            scanlinesCount: 4096,
+            grayscale: false
+        };
+        const filmPass = new FilmPass(filmParams.noiseIntensity, filmParams.scanlinesIntensity, filmParams.scanlinesCount, filmParams.grayscale);
+        composer.addPass(filmPass);
+
+        const vignetteParams = {
+            enabled: true,
+            offset: 0.5,
+            darkness: 0.5
+        };
+        const vignettePass = new ShaderPass(VignetteShader);
+        vignettePass.uniforms.offset.value = vignetteParams.offset;
+        vignettePass.uniforms.darkness.value = vignetteParams.darkness;
+        composer.addPass(vignettePass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -79,7 +118,7 @@
         // Add ambient light with baked params
         const ambientParams = {
             color: '#ffffff',
-            intensity: 0
+            intensity: 0.31
         };
         const ambient = new THREE.AmbientLight(ambientParams.color, ambientParams.intensity);
         scene.add(ambient);
@@ -87,7 +126,7 @@
         // Add 3 customizable lights with baked params
         const lightSlots = [
             { params: { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: { x: 7.7, y: 3.8, z: -17.2 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } },
-            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 3.44, position: { x: -1.5, y: 5, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
+            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 4.02, position: { x: -1.9, y: 3.3, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
             { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: { x: 0, y: 5, z: -5 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } }
         ];
 
@@ -146,8 +185,10 @@
         }
         updateCameraFov();
 
-        // GUI setup
+        // GUI setup on left
         const gui = new GUI();
+        gui.domElement.style.right = 'auto';
+        gui.domElement.style.left = '0';
 
         // Camera folder (focal length only, position/rotation via OrbitControls)
         const cameraFolder = gui.addFolder('Camera');
@@ -222,6 +263,27 @@
             const folder = gui.addFolder(`Light ${i + 1}`);
             buildLightGui(folder, i);
         });
+
+        // Post-processing GUI
+        const postFolder = gui.addFolder('Post Processing');
+
+        const bloomFolder = postFolder.addFolder('Bloom');
+        bloomFolder.add(bloomParams, 'enabled').onChange(v => bloomPass.enabled = v);
+        bloomFolder.add(bloomParams, 'strength', 0, 3, 0.01).onChange(v => bloomPass.strength = v);
+        bloomFolder.add(bloomParams, 'radius', 0, 1, 0.01).onChange(v => bloomPass.radius = v);
+        bloomFolder.add(bloomParams, 'threshold', 0, 1, 0.01).onChange(v => bloomPass.threshold = v);
+
+        const filmFolder = postFolder.addFolder('Film');
+        filmFolder.add(filmParams, 'enabled').onChange(v => filmPass.enabled = v);
+        filmFolder.add(filmParams, 'noiseIntensity', 0, 1, 0.01).onChange(v => filmPass.uniforms.nIntensity.value = v);
+        filmFolder.add(filmParams, 'scanlinesIntensity', 0, 1, 0.01).onChange(v => filmPass.uniforms.sIntensity.value = v);
+        filmFolder.add(filmParams, 'scanlinesCount', 0, 4096, 1).onChange(v => filmPass.uniforms.sCount.value = v);
+        filmFolder.add(filmParams, 'grayscale').onChange(v => filmPass.uniforms.grayscale.value = v);
+
+        const vignetteFolder = postFolder.addFolder('Vignette');
+        vignetteFolder.add(vignetteParams, 'enabled').onChange(v => vignettePass.enabled = v);
+        vignetteFolder.add(vignetteParams, 'offset', 0, 2, 0.01).onChange(v => vignettePass.uniforms.offset.value = v);
+        vignetteFolder.add(vignetteParams, 'darkness', 0, 2, 0.01).onChange(v => vignettePass.uniforms.darkness.value = v);
 
         // Model loading
         const glbUrl = './scene-optimized.glb'; // Assuming the GLB file is in the same directory as index.html on your Netlify site
@@ -362,6 +424,7 @@
         // Resize handler
         window.addEventListener('resize', () => {
             renderer.setSize(container.clientWidth, container.clientHeight);
+            composer.setSize(container.clientWidth, container.clientHeight);
             camera.aspect = container.clientWidth / container.clientHeight;
             camera.updateProjectionMatrix();
         });
@@ -370,7 +433,7 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
-            renderer.render(scene, camera);
+            composer.render();
         }
         animate();
     </script>
