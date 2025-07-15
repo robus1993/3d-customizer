@@ -254,9 +254,9 @@
                 // Identify objects and enable shadows
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color277'].includes(child.name)) {
+                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color27'].includes(child.name)) {
                             primaryColorObjects.push(child);
-                        } else if (['Color21', 'Color25', 'Color277'].includes(child.name)) {
+                        } else if (['Color21', 'Color25', 'Color27'].includes(child.name)) {
                             secondaryColorObjects.push(child);
                         }
                         if (child.name.startsWith('Decal')) decalObjects.push(child);
