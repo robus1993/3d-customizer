@@ -64,11 +64,12 @@
         camera.position.set(-0.14174618135894057, 2.1952267593971606, 10.254996729868925);
         camera.rotation.set(-0.06287602690434883, -0.011933009173710245, -0.0007512725447900868);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setClearColor(0x000000, 0); // Transparent background
         container.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -85,9 +86,9 @@
 
         // Add 3 customizable lights with baked params
         const lightSlots = [
-            { params: { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: { x: 7.7, y: 3.8, z: -17.2 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
+            { params: { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: { x: 7.7, y: 3.8, z: -17.2 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } },
             { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 3.44, position: { x: -1.5, y: 5, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
-            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: { x: 0, y: 5, z: -5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } }
+            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: { x: 0, y: 5, z: -5 }, castShadow: false, distance: 0, decay: 1, groundColor: '#ffffff' } }
         ];
 
         // Function to create light from params
@@ -99,21 +100,27 @@
                 light = new THREE.DirectionalLight(color, intensity);
                 light.target = new THREE.Object3D();
                 light.castShadow = params.castShadow;
-                light.shadow.mapSize.width = 2048;
-                light.shadow.mapSize.height = 2048;
-                light.shadow.camera.near = 0.1;
-                light.shadow.camera.far = 100;
-                light.shadow.camera.left = -20;
-                light.shadow.camera.right = 20;
-                light.shadow.camera.top = 20;
-                light.shadow.camera.bottom = -20;
+                if (params.castShadow) {
+                    light.shadow.mapSize.width = 2048;
+                    light.shadow.mapSize.height = 2048;
+                    light.shadow.camera.near = 0.1;
+                    light.shadow.camera.far = 100;
+                    light.shadow.camera.left = -20;
+                    light.shadow.camera.right = 20;
+                    light.shadow.camera.top = 20;
+                    light.shadow.camera.bottom = -20;
+                    light.shadow.bias = -0.0001; // To reduce shadow acne
+                }
             } else if (params.type === 'PointLight') {
                 light = new THREE.PointLight(color, intensity, params.distance, params.decay);
                 light.castShadow = params.castShadow;
-                light.shadow.mapSize.width = 2048;
-                light.shadow.mapSize.height = 2048;
-                light.shadow.camera.near = 0.1;
-                light.shadow.camera.far = 100;
+                if (params.castShadow) {
+                    light.shadow.mapSize.width = 2048;
+                    light.shadow.mapSize.height = 2048;
+                    light.shadow.camera.near = 0.1;
+                    light.shadow.camera.far = 100;
+                    light.shadow.bias = -0.0001;
+                }
             } else if (params.type === 'HemisphereLight') {
                 light = new THREE.HemisphereLight(color, new THREE.Color(params.groundColor), intensity);
             }
@@ -190,7 +197,15 @@
 
             // Cast shadow if applicable
             if (params.type === 'DirectionalLight' || params.type === 'PointLight') {
-                folder.add(params, 'castShadow').onChange(v => lightSlots[slotIndex].light.castShadow = v);
+                folder.add(params, 'castShadow').onChange(v => {
+                    lightSlots[slotIndex].light.castShadow = v;
+                    // Re-create light to apply shadow settings if needed
+                    scene.remove(lightSlots[slotIndex].light);
+                    if (lightSlots[slotIndex].light.target) scene.remove(lightSlots[slotIndex].light.target);
+                    lightSlots[slotIndex].light = createLightFromParams(params);
+                    scene.add(lightSlots[slotIndex].light);
+                    if (lightSlots[slotIndex].light.target) scene.add(lightSlots[slotIndex].light.target);
+                });
             }
 
             // Type-specific
@@ -230,12 +245,17 @@
                         }
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        // For smooth shading
+                        child.material.flatShading = false;
+                        child.geometry.computeVertexNormals();
                     }
                 });
 
                 // Setup floor as shadow catcher
                 if (floorMesh) {
+                    if (floorMesh.material.map) floorMesh.material.map.dispose(); // Dispose old texture if any
                     floorMesh.material = new THREE.ShadowMaterial();
+                    floorMesh.material.opacity = 1; // Adjust for shadow strength
                     floorMesh.receiveShadow = true;
                     floorMesh.castShadow = false; // Floor doesn't cast shadows
                 }
