@@ -19,19 +19,21 @@
 
     <div id="three-container" class="w-full h-[80vh]"></div>
 
-    <div class="bg-white p-6 rounded shadow-md mt-4">
+    <div class="bg-white p-6 rounded-lg shadow-md mt-4">
         <h2 class="text-2xl font-bold mb-4">Customize Product</h2>
         <div class="flex flex-col space-y-4">
             <div>
                 <label class="block mb-2">Product Color</label>
                 <input id="product-color" type="color" class="w-full h-10">
             </div>
+
             <div>
                 <label class="block mb-2">Upload Logo (.png)</label>
                 <input id="logo-upload" type="file" accept=".png" class="w-full">
             </div>
         </div>
         <button id="apply-customization" class="bg-green-500 text-white px-4 py-2 mt-4 w-full">Apply Customization</button>
+        <button id="log-settings" class="bg-blue-500 text-white px-4 py-2 mt-4 w-full">Log Current Settings</button>
     </div>
 
     <script type="importmap">
@@ -46,55 +48,164 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js';
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
         const colorPicker = document.getElementById('product-color');
         const logoUpload = document.getElementById('logo-upload');
         const applyBtn = document.getElementById('apply-customization');
+        const logBtn = document.getElementById('log-settings');
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(-0.14174618135894057, 2.1952267593971606, 10.254996729868925);
+        camera.rotation.set(-0.06287602690434883, -0.011933009173710245, -0.0007512725447900868);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
-        // Baked camera settings
-        camera.position.set(-0.14174618135894057, 2.1952267593971606, 10.254996729868925);
-        camera.rotation.set(-0.06287602690434883, -0.011933009173710245, -0.0007512725447900868, 'XYZ');
-        const focalLength = 50;
-        const sensorHeight = 24; // mm, vertical
-        camera.fov = 2 * Math.atan(sensorHeight / (2 * focalLength)) * (180 / Math.PI);
-        camera.updateProjectionMatrix();
-
-        // Baked ambient light
-        const ambient = new THREE.AmbientLight('#ffffff', 0);
+        // Add ambient light with baked params
+        const ambientParams = {
+            color: '#ffffff',
+            intensity: 0
+        };
+        const ambient = new THREE.AmbientLight(ambientParams.color, ambientParams.intensity);
         scene.add(ambient);
 
-        // Baked lights
-        const lightsData = [
-            { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: [7.7, 3.8, -17.2] },
-            { type: 'DirectionalLight', color: '#ffffff', intensity: 3.44, position: [-1.5, 5, 5] },
-            { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: [0, 5, -5] }
+        // Add 3 customizable lights with baked params
+        const lightSlots = [
+            { params: { type: 'DirectionalLight', color: '#0040ff', intensity: 7.25, position: { x: 7.7, y: 3.8, z: -17.2 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
+            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 3.44, position: { x: -1.5, y: 5, z: 5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } },
+            { params: { type: 'DirectionalLight', color: '#ffffff', intensity: 1.6, position: { x: 0, y: 5, z: -5 }, castShadow: true, distance: 0, decay: 1, groundColor: '#ffffff' } }
         ];
 
-        lightsData.forEach(data => {
+        // Function to create light from params
+        function createLightFromParams(params) {
             let light;
-            if (data.type === 'DirectionalLight') {
-                light = new THREE.DirectionalLight(data.color, data.intensity);
-                light.position.set(...data.position);
-                light.target = new THREE.Object3D(); // Target at origin
-                scene.add(light.target);
-            } // Add other types if needed in future
-            scene.add(light);
+            const color = new THREE.Color(params.color);
+            const intensity = params.intensity;
+            if (params.type === 'DirectionalLight') {
+                light = new THREE.DirectionalLight(color, intensity);
+                light.target = new THREE.Object3D();
+                light.castShadow = params.castShadow;
+                light.shadow.mapSize.width = 2048;
+                light.shadow.mapSize.height = 2048;
+                light.shadow.camera.near = 0.1;
+                light.shadow.camera.far = 100;
+                light.shadow.camera.left = -20;
+                light.shadow.camera.right = 20;
+                light.shadow.camera.top = 20;
+                light.shadow.camera.bottom = -20;
+            } else if (params.type === 'PointLight') {
+                light = new THREE.PointLight(color, intensity, params.distance, params.decay);
+                light.castShadow = params.castShadow;
+                light.shadow.mapSize.width = 2048;
+                light.shadow.mapSize.height = 2048;
+                light.shadow.camera.near = 0.1;
+                light.shadow.camera.far = 100;
+            } else if (params.type === 'HemisphereLight') {
+                light = new THREE.HemisphereLight(color, new THREE.Color(params.groundColor), intensity);
+            }
+            if (light.position) light.position.set(params.position.x, params.position.y, params.position.z);
+            return light;
+        }
+
+        // Initialize lights
+        lightSlots.forEach(slot => {
+            slot.light = createLightFromParams(slot.params);
+            scene.add(slot.light);
+            if (slot.light.target) scene.add(slot.light.target);
+        });
+
+        // Camera focal length control with baked value
+        const cameraParams = {
+            focalLength: 50 // mm, baked
+        };
+        function updateCameraFov() {
+            const sensorHeight = 24; // mm, vertical
+            camera.fov = 2 * Math.atan(sensorHeight / (2 * cameraParams.focalLength)) * (180 / Math.PI);
+            camera.updateProjectionMatrix();
+        }
+        updateCameraFov();
+
+        // GUI setup
+        const gui = new GUI();
+
+        // Camera folder (focal length only, position/rotation via OrbitControls)
+        const cameraFolder = gui.addFolder('Camera');
+        cameraFolder.add(cameraParams, 'focalLength', 5, 200, 1).onChange(updateCameraFov);
+
+        // Ambient light folder
+        const ambientFolder = gui.addFolder('Ambient Light');
+        ambientFolder.addColor(ambientParams, 'color').onChange(v => ambient.color.set(v));
+        ambientFolder.add(ambientParams, 'intensity', 0, 2, 0.01).onChange(v => ambient.intensity = v);
+
+        // Function to build GUI for a light slot
+        function buildLightGui(folder, slotIndex) {
+            const params = lightSlots[slotIndex].params;
+
+            // Clear existing controllers
+            folder.controllersRecursive().forEach(c => c.destroy());
+            folder.children.forEach(child => {
+                if (child.isFolder) child.destroy();
+            });
+
+            // Add type dropdown
+            folder.add(params, 'type', ['DirectionalLight', 'PointLight', 'HemisphereLight']).onChange(() => {
+                // Update light
+                if (lightSlots[slotIndex].light) {
+                    scene.remove(lightSlots[slotIndex].light);
+                    if (lightSlots[slotIndex].light.target) scene.remove(lightSlots[slotIndex].light.target);
+                }
+                lightSlots[slotIndex].light = createLightFromParams(params);
+                scene.add(lightSlots[slotIndex].light);
+                if (lightSlots[slotIndex].light.target) scene.add(lightSlots[slotIndex].light.target);
+
+                // Rebuild GUI
+                buildLightGui(folder, slotIndex);
+            });
+
+            // Common params
+            folder.addColor(params, 'color').onChange(v => lightSlots[slotIndex].light.color.set(v));
+            folder.add(params, 'intensity', 0, 10, 0.01).onChange(v => lightSlots[slotIndex].light.intensity = v);
+
+            // Position if applicable (not for Hemisphere)
+            if (params.type !== 'HemisphereLight') {
+                const posFolder = folder.addFolder('Position');
+                posFolder.add(params.position, 'x', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.x = v);
+                posFolder.add(params.position, 'y', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.y = v);
+                posFolder.add(params.position, 'z', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.z = v);
+            }
+
+            // Cast shadow if applicable
+            if (params.type === 'DirectionalLight' || params.type === 'PointLight') {
+                folder.add(params, 'castShadow').onChange(v => lightSlots[slotIndex].light.castShadow = v);
+            }
+
+            // Type-specific
+            if (params.type === 'PointLight') {
+                folder.add(params, 'distance', 0, 100, 0.1).onChange(v => lightSlots[slotIndex].light.distance = v);
+                folder.add(params, 'decay', 0, 2, 0.01).onChange(v => lightSlots[slotIndex].light.decay = v);
+            } else if (params.type === 'HemisphereLight') {
+                folder.addColor(params, 'groundColor').onChange(v => lightSlots[slotIndex].light.groundColor.set(v));
+            }
+        }
+
+        // Create light folders
+        lightSlots.forEach((slot, i) => {
+            const folder = gui.addFolder(`Light ${i + 1}`);
+            buildLightGui(folder, i);
         });
 
         // Model loading
@@ -108,13 +219,26 @@
             (gltf) => {
                 scene.add(gltf.scene);
 
-                // Identify objects
+                // Identify objects and enable shadows
+                let floorMesh = null;
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
                         if (child.name.startsWith('Color')) colorObjects.push(child);
                         if (child.name.startsWith('Decal')) decalObjects.push(child);
+                        if (child.name === 'Floor') {
+                            floorMesh = child;
+                        }
+                        child.castShadow = true;
+                        child.receiveShadow = true;
                     }
                 });
+
+                // Setup floor as shadow catcher
+                if (floorMesh) {
+                    floorMesh.material = new THREE.ShadowMaterial();
+                    floorMesh.receiveShadow = true;
+                    floorMesh.castShadow = false; // Floor doesn't cast shadows
+                }
 
                 // Center the model
                 const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -186,6 +310,36 @@
                 };
                 reader.readAsDataURL(logoImageFile);
             }
+        });
+
+        // Log settings button
+        logBtn.addEventListener('click', () => {
+            const settings = {
+                camera: {
+                    position: camera.position.toArray(),
+                    rotation: camera.rotation.toArray().concat(camera.rotation.order),
+                    focalLength: cameraParams.focalLength
+                },
+                ambient: {
+                    color: ambientParams.color,
+                    intensity: ambientParams.intensity
+                },
+                lights: lightSlots.map(slot => ({
+                    type: slot.params.type,
+                    color: slot.params.color,
+                    intensity: slot.params.intensity,
+                    position: [slot.params.position.x, slot.params.position.y, slot.params.position.z],
+                    castShadow: slot.params.castShadow,
+                    ...(slot.params.type === 'PointLight' ? {
+                        distance: slot.params.distance,
+                        decay: slot.params.decay
+                    } : {}),
+                    ...(slot.params.type === 'HemisphereLight' ? {
+                        groundColor: slot.params.groundColor
+                    } : {})
+                }))
+            };
+            console.log(JSON.stringify(settings, null, 2));
         });
 
         // Resize handler
