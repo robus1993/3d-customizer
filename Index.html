@@ -246,6 +246,7 @@
         let secondaryColorObjects = [];
         let decalObjects = [];
         let shadowCatcherPlane = null;
+        let allMeshes = []; // New array for all meshes
         loader.load(
             glbUrl,
             (gltf) => {
@@ -254,6 +255,7 @@
                 // Identify objects and enable shadows
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
+                        allMeshes.push(child); // Collect all meshes
                         if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color27'].includes(child.name)) {
                             primaryColorObjects.push(child);
                         } else if (['Color21', 'Color25', 'Color27'].includes(child.name)) {
@@ -282,6 +284,15 @@
                 const center = box.getCenter(new THREE.Vector3());
                 controls.target.copy(center);
                 camera.lookAt(center);
+
+                // Add object visibility toggles to GUI
+                const visibilityFolder = gui.addFolder('Object Visibility');
+                allMeshes.forEach((mesh) => {
+                    const toggleObj = { visible: true };
+                    visibilityFolder.add(toggleObj, 'visible').name(mesh.name).onChange((v) => {
+                        mesh.visible = v;
+                    });
+                });
 
                 // Hide loading
                 loadingDiv.style.display = 'none';
