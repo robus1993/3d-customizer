@@ -3,385 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>glTF Product Customizer</title>
+    <title>Interactive 3D Product Customizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            overflow-x: hidden;
-        }
-        #scene-container {
-            width: 100%;
-            height: 65vh;
-            display: block;
-            position: relative;
-            background-color: #e0e0e0;
-        }
-        #loader-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 100;
-            color: white;
-            font-size: 1.2rem;
-            transition: opacity 0.5s;
-        }
-        .form-container {
-            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-        }
-        input[type="color"] {
-            -webkit-appearance: none;
-            border: none;
-            width: 48px;
-            height: 48px;
-            padding: 0;
-            border-radius: 0.5rem;
-            cursor: pointer;
-        }
-        input[type="color"]::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-        input[type="color"]::-webkit-color-swatch {
-            border: none;
-            border-radius: 0.5rem;
-        }
+        /* Add any inline styles here if needed, as per the brief */
+        body { background-color: #f0f0f0; }
+        /* Tailwind can handle most styling */
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100">
+<body class="flex flex-col items-center justify-center min-h-screen">
 
-    <!-- Container for the Three.js scene -->
-    <div id="scene-container">
-        <div id="loader-container">
-            <p id="loader-text">Loading... 0%</p>
-        </div>
+    <div id="loading" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+        <div class="text-xl font-bold">Loading... 0%</div>
     </div>
 
-    <!-- Customization Form -->
-    <div class="flex justify-center items-start p-4 md:p-8">
-        <form id="customization-form" class="form-container bg-white p-6 rounded-lg w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-6 text-gray-800 text-center">Customize Product</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <!-- Color Picker Input -->
-                <div>
-                    <label for="color-picker" class="block text-sm font-medium text-gray-700 mb-2">Product Color</label>
-                    <div class="flex items-center gap-3">
-                        <input type="color" id="color-picker" name="color-picker" value="#3b82f6">
-                        <input type="text" id="hex-input" class="mt-0 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="#3b82f6">
-                    </div>
-                </div>
-                
-                <!-- Logo Upload Input -->
-                <div>
-                    <label for="logo-upload" class="block text-sm font-medium text-gray-700 mb-2">Upload Logo (.png)</label>
-                    <input type="file" id="logo-upload" name="logo-upload" accept="image/png" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer">
-                </div>
+    <div id="three-container" class="w-full h-[80vh]"></div>
+
+    <div class="bg-white p-6 rounded shadow-md mt-4">
+        <h2 class="text-2xl font-bold mb-4">Customize Product</h2>
+        <div class="flex flex-col space-y-4">
+            <div>
+                <label class="block mb-2">Product Color</label>
+                <input id="product-color" type="color" class="w-full h-10">
             </div>
-
-            <!-- Submit Button -->
-            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
-                Apply Customization
-            </button>
-            <p id="error-message" class="text-red-500 text-sm mt-4 text-center"></p>
-        </form>
+            <div>
+                <label class="block mb-2">Upload Logo (.png)</label>
+                <input id="logo-upload" type="file" accept=".png" class="w-full">
+            </div>
+        </div>
+        <button id="apply-customization" class="bg-green-500 text-white px-4 py-2 mt-4 w-full">Apply Customization</button>
+        <button id="log-settings" class="bg-blue-500 text-white px-4 py-2 mt-4 w-full">Log Current Settings</button>
     </div>
 
-    <!-- Three.js and its loaders -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
-                "meshopt_decoder": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/meshopt_decoder.module.js",
-                "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.js"
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
             }
         }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { MeshoptDecoder } from 'meshopt_decoder';
-        import GUI from 'lil-gui';
+        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js';
 
-        // --- SCENE SETUP ---
-        let scene, camera, renderer, controls;
-        const sceneContainer = document.getElementById('scene-container');
-        const loaderContainer = document.getElementById('loader-container');
-        const loaderText = document.getElementById('loader-text');
+        const container = document.getElementById('three-container');
+        const loadingDiv = document.getElementById('loading');
+        const colorPicker = document.getElementById('product-color');
+        const logoUpload = document.getElementById('logo-upload');
+        const applyBtn = document.getElementById('apply-customization');
+        const logBtn = document.getElementById('log-settings');
 
-        // --- ARRAYS TO HOLD OUR TARGET OBJECTS ---
-        const colorChangeObjects = [];
-        const decalMaterials = [];
-        const lights = [];
-        let ambientLight;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 0, 5);
 
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x333333);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
 
-            camera = new THREE.PerspectiveCamera(50, sceneContainer.clientWidth / sceneContainer.clientHeight, 0.1, 1000);
-            camera.position.set(5, 5, 10);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.outputColorSpace = THREE.SRGBColorSpace;
-            sceneContainer.appendChild(renderer.domElement);
+        // Add ambient light
+        const ambientParams = {
+            color: '#ffffff',
+            intensity: 0.5
+        };
+        const ambient = new THREE.AmbientLight(ambientParams.color, ambientParams.intensity);
+        scene.add(ambient);
 
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-
-            // --- LIGHTING SETUP ---
-            ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-            scene.add(ambientLight);
-
-            // Create three initial point lights with corrected intensity
-            lights.push(createLight('PointLight', 0xffffff, 1000, new THREE.Vector3(5, 5, 5)));
-            lights.push(createLight('PointLight', 0xffe0b3, 1000, new THREE.Vector3(-5, 5, 5)));
-            lights.push(createLight('PointLight', 0xb3e0ff, 1000, new THREE.Vector3(0, 5, -5)));
-            lights.forEach(light => scene.add(light));
-            
-            loadModel();
-            setupGUI();
-
-            window.addEventListener('resize', onWindowResize, false);
-            animate();
+        // Add 3 customizable lights
+        const lightSlots = [];
+        for (let i = 0; i < 3; i++) {
+            const initialType = 'DirectionalLight';
+            const params = {
+                type: initialType,
+                color: '#ffffff',
+                intensity: 1,
+                position: { x: (i - 1) * 3, y: 5, z: 5 },
+                distance: 0, // for PointLight
+                decay: 1, // for PointLight
+                groundColor: '#ffffff' // for HemisphereLight
+            };
+            lightSlots.push({ params });
         }
 
-        function createLight(type, color, intensity, position) {
+        // Initial positions for the 3 lights around the object
+        lightSlots[0].params.position = { x: 5, y: 5, z: 5 };
+        lightSlots[1].params.position = { x: -5, y: 5, z: 5 };
+        lightSlots[2].params.position = { x: 0, y: 5, z: -5 };
+
+        // Function to create light from params
+        function createLightFromParams(params) {
             let light;
-            switch (type) {
-                case 'DirectionalLight':
-                    light = new THREE.DirectionalLight(color, intensity);
-                    break;
-                case 'SpotLight':
-                    light = new THREE.SpotLight(color, intensity);
-                    break;
-                case 'PointLight':
-                default:
-                    light = new THREE.PointLight(color, intensity);
-                    break;
+            const color = new THREE.Color(params.color);
+            const intensity = params.intensity;
+            if (params.type === 'DirectionalLight') {
+                light = new THREE.DirectionalLight(color, intensity);
+                light.target = new THREE.Object3D();
+            } else if (params.type === 'PointLight') {
+                light = new THREE.PointLight(color, intensity, params.distance, params.decay);
+            } else if (params.type === 'HemisphereLight') {
+                light = new THREE.HemisphereLight(color, new THREE.Color(params.groundColor), intensity);
             }
-            light.position.copy(position);
-            light.castShadow = true;
-            light.shadow.mapSize.width = 2048;
-            light.shadow.mapSize.height = 2048;
+            if (light.position) light.position.set(params.position.x, params.position.y, params.position.z);
             return light;
         }
 
-        function loadModel() {
-            const manager = new THREE.LoadingManager();
-            manager.onProgress = (url, itemsLoaded, itemsTotal) => {
-                const progress = Math.round((itemsLoaded / itemsTotal) * 100);
-                loaderText.textContent = `Loading... ${progress}%`;
-            };
-            manager.onLoad = () => {
-                loaderContainer.style.opacity = '0';
-                setTimeout(() => { loaderContainer.style.display = 'none'; }, 500);
-            };
+        // Initialize lights
+        lightSlots.forEach(slot => {
+            slot.light = createLightFromParams(slot.params);
+            scene.add(slot.light);
+            if (slot.light.target) scene.add(slot.light.target);
+        });
 
-            const loader = new GLTFLoader(manager);
-            loader.setCrossOrigin('anonymous');
-            loader.setMeshoptDecoder(MeshoptDecoder);
-            
-            const modelURL = 'https://chimerical-figolla-e90d20.netlify.app/scene-optimized.glb';
-            
-            loader.load(modelURL, (gltf) => {
-                const model = gltf.scene;
-                model.traverse((child) => {
+        // Camera focal length control (assuming vertical sensor size of 24mm for full-frame equivalent)
+        const cameraParams = {
+            focalLength: 50 // mm, initial
+        };
+        function updateCameraFov() {
+            const sensorHeight = 24; // mm, vertical
+            camera.fov = 2 * Math.atan(sensorHeight / (2 * cameraParams.focalLength)) * (180 / Math.PI);
+            camera.updateProjectionMatrix();
+        }
+        updateCameraFov();
+
+        // GUI setup
+        const gui = new GUI();
+
+        // Camera folder (focal length only, position/rotation via OrbitControls)
+        const cameraFolder = gui.addFolder('Camera');
+        cameraFolder.add(cameraParams, 'focalLength', 5, 200, 1).onChange(updateCameraFov);
+
+        // Ambient light folder
+        const ambientFolder = gui.addFolder('Ambient Light');
+        ambientFolder.addColor(ambientParams, 'color').onChange(v => ambient.color.set(v));
+        ambientFolder.add(ambientParams, 'intensity', 0, 2, 0.01).onChange(v => ambient.intensity = v);
+
+        // Function to build GUI for a light slot
+        function buildLightGui(folder, slotIndex) {
+            const params = lightSlots[slotIndex].params;
+
+            // Clear existing controllers
+            folder.controllersRecursive().forEach(c => c.destroy());
+            folder.children.forEach(child => {
+                if (child.isFolder) child.destroy();
+            });
+
+            // Add type dropdown
+            folder.add(params, 'type', ['DirectionalLight', 'PointLight', 'HemisphereLight']).onChange(() => {
+                // Update light
+                if (lightSlots[slotIndex].light) {
+                    scene.remove(lightSlots[slotIndex].light);
+                    if (lightSlots[slotIndex].light.target) scene.remove(lightSlots[slotIndex].light.target);
+                }
+                lightSlots[slotIndex].light = createLightFromParams(params);
+                scene.add(lightSlots[slotIndex].light);
+                if (lightSlots[slotIndex].light.target) scene.add(lightSlots[slotIndex].light.target);
+
+                // Rebuild GUI
+                buildLightGui(folder, slotIndex);
+            });
+
+            // Common params
+            folder.addColor(params, 'color').onChange(v => lightSlots[slotIndex].light.color.set(v));
+            folder.add(params, 'intensity', 0, 10, 0.01).onChange(v => lightSlots[slotIndex].light.intensity = v);
+
+            // Position if applicable (not for Hemisphere)
+            if (params.type !== 'HemisphereLight') {
+                const posFolder = folder.addFolder('Position');
+                posFolder.add(params.position, 'x', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.x = v);
+                posFolder.add(params.position, 'y', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.y = v);
+                posFolder.add(params.position, 'z', -50, 50, 0.1).onChange(v => lightSlots[slotIndex].light.position.z = v);
+            }
+
+            // Type-specific
+            if (params.type === 'PointLight') {
+                folder.add(params, 'distance', 0, 100, 0.1).onChange(v => lightSlots[slotIndex].light.distance = v);
+                folder.add(params, 'decay', 0, 2, 0.01).onChange(v => lightSlots[slotIndex].light.decay = v);
+            } else if (params.type === 'HemisphereLight') {
+                folder.addColor(params, 'groundColor').onChange(v => lightSlots[slotIndex].light.groundColor.set(v));
+            }
+        }
+
+        // Create light folders
+        lightSlots.forEach((slot, i) => {
+            const folder = gui.addFolder(`Light ${i + 1}`);
+            buildLightGui(folder, i);
+        });
+
+        // Model loading
+        const glbUrl = './scene-optimized.glb'; // Assuming the GLB file is in the same directory as index.html on your Netlify site
+        const loader = new GLTFLoader();
+        loader.setMeshoptDecoder(MeshoptDecoder);
+        let colorObjects = [];
+        let decalObjects = [];
+        loader.load(
+            glbUrl,
+            (gltf) => {
+                scene.add(gltf.scene);
+
+                // Identify objects
+                gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        if (child.name.startsWith('Color')) colorChangeObjects.push(child);
-                        if (child.name.startsWith('Decal')) {
-                            if (!decalMaterials.includes(child.material)) {
-                                decalMaterials.push(child.material);
-                                child.material.transparent = true;
-                            }
-                        }
+                        if (child.name.startsWith('Color')) colorObjects.push(child);
+                        if (child.name.startsWith('Decal')) decalObjects.push(child);
                     }
                 });
-                scene.add(model);
-                
-                const box = new THREE.Box3().setFromObject(model);
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(gltf.scene);
                 const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const fov = camera.fov * (Math.PI / 180);
-                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                cameraZ *= 1.5;
-                
-                camera.position.set(center.x, center.y + size.y * 0.2, center.z + cameraZ);
                 controls.target.copy(center);
-                controls.update();
-            }, undefined, (error) => {
-                console.error(error);
-                loaderText.textContent = 'Error loading model.';
+                camera.lookAt(center);
+
+                // Hide loading
+                loadingDiv.style.display = 'none';
+            },
+            (xhr) => {
+                const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                loadingDiv.innerHTML = `<div class="text-xl font-bold">Loading... ${percent}%</div>`;
+            },
+            (error) => console.error('An error happened', error)
+        );
+
+        // Customization logic
+        let selectedColor = new THREE.Color(colorPicker.value);
+        let logoImageFile = null;
+
+        colorPicker.addEventListener('input', (e) => {
+            selectedColor.set(e.target.value);
+        });
+
+        logoUpload.addEventListener('change', (e) => {
+            logoImageFile = e.target.files[0];
+        });
+
+        applyBtn.addEventListener('click', () => {
+            // Apply color
+            colorObjects.forEach((mesh) => {
+                mesh.material.color.set(selectedColor);
             });
-        }
 
-        function setupGUI() {
-            const gui = new GUI();
-            gui.domElement.style.marginTop = '65px'; // Offset from top
+            // Apply logo
+            if (logoImageFile) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvasSize = 1024; // High res for texture
+                        const canvas = document.createElement('canvas');
+                        canvas.width = canvasSize;
+                        canvas.height = canvasSize;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvasSize, canvasSize);
 
-            // Camera Controls
-            const cameraFolder = gui.addFolder('Camera');
-            cameraFolder.add(camera, 'fov', 10, 120, 1).name('Focal Length').onChange(() => camera.updateProjectionMatrix());
-            const camPosFolder = cameraFolder.addFolder('Position');
-            camPosFolder.add(camera.position, 'x', -20, 20, 0.1);
-            camPosFolder.add(camera.position, 'y', -20, 20, 0.1);
-            camPosFolder.add(camera.position, 'z', -20, 20, 0.1);
-            const camRotFolder = cameraFolder.addFolder('Rotation');
-            camRotFolder.add(camera.rotation, 'x', -Math.PI, Math.PI, 0.01);
-            camRotFolder.add(camera.rotation, 'y', -Math.PI, Math.PI, 0.01);
-            camRotFolder.add(camera.rotation, 'z', -Math.PI, Math.PI, 0.01);
+                        // Scale and center with 80% fit (20% margin total, 10% each side)
+                        const fitRatio = 0.8;
+                        const scale = Math.min((canvasSize * fitRatio) / img.width, (canvasSize * fitRatio) / img.height);
+                        const dw = img.width * scale;
+                        const dh = img.height * scale;
+                        const dx = (canvasSize - dw) / 2;
+                        const dy = (canvasSize - dh) / 2;
 
-            // Ambient Light Controls
-            const ambientFolder = gui.addFolder('Ambient Light');
-            ambientFolder.addColor(ambientLight, 'color');
-            ambientFolder.add(ambientLight, 'intensity', 0, 2, 0.01);
+                        ctx.drawImage(img, dx, dy, dw, dh);
 
-            // Punctual Light Controls
-            lights.forEach((light, index) => {
-                const folder = gui.addFolder(`Light ${index + 1}`);
-                folder.add(light, 'visible');
-                folder.addColor(light, 'color');
-                // Corrected intensity range for point lights
-                folder.add(light, 'intensity', 0, 4000, 10).name('Intensity');
-                
-                const posFolder = folder.addFolder('Position');
-                posFolder.add(light.position, 'x', -20, 20, 0.1);
-                posFolder.add(light.position, 'y', -20, 20, 0.1);
-                posFolder.add(light.position, 'z', -20, 20, 0.1);
-            });
-            
-            // Log Settings Button
-            const settingsExporter = {
-                logSettings: () => {
-                    const settings = {
-                        camera: {
-                            position: camera.position.toArray(),
-                            rotation: [camera.rotation.x, camera.rotation.y, camera.rotation.z],
-                            fov: camera.fov
-                        },
-                        ambientLight: {
-                            color: '#' + ambientLight.color.getHexString(),
-                            intensity: ambientLight.intensity
-                        },
-                        lights: lights.map(l => ({
-                            type: l.type,
-                            color: '#' + l.color.getHexString(),
-                            intensity: l.intensity,
-                            position: l.position.toArray(),
-                            visible: l.visible
-                        }))
+                        const texture = new THREE.CanvasTexture(canvas);
+                        texture.flipY = false;
+
+                        decalObjects.forEach((mesh) => {
+                            if (mesh.material.map) mesh.material.map.dispose();
+                            mesh.material.map = texture;
+                            mesh.material.needsUpdate = true;
+                        });
                     };
-                    console.log(JSON.stringify(settings, null, 2));
-                    // Replaced alert with console log
-                    console.log('Settings have been logged to the browser console (Press F12).');
-                }
+                };
+                reader.readAsDataURL(logoImageFile);
+            }
+        });
+
+        // Log settings button
+        logBtn.addEventListener('click', () => {
+            const settings = {
+                camera: {
+                    position: camera.position.toArray(),
+                    rotation: camera.rotation.toArray(),
+                    focalLength: cameraParams.focalLength
+                },
+                ambient: {
+                    color: ambientParams.color,
+                    intensity: ambientParams.intensity
+                },
+                lights: lightSlots.map(slot => ({
+                    type: slot.params.type,
+                    color: slot.params.color,
+                    intensity: slot.params.intensity,
+                    position: [slot.params.position.x, slot.params.position.y, slot.params.position.z],
+                    ...(slot.params.type === 'PointLight' ? {
+                        distance: slot.params.distance,
+                        decay: slot.params.decay
+                    } : {}),
+                    ...(slot.params.type === 'HemisphereLight' ? {
+                        groundColor: slot.params.groundColor
+                    } : {})
+                }))
             };
-            gui.add(settingsExporter, 'logSettings').name('Log Final Settings');
-        }
+            console.log(JSON.stringify(settings, null, 2));
+        });
 
-        function updateColor(colorHex) {
-            const newColor = new THREE.Color(colorHex);
-            colorChangeObjects.forEach(obj => {
-                if(obj.material && obj.material.color) obj.material.color.set(newColor);
-            });
-        }
+        // Resize handler
+        window.addEventListener('resize', () => {
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+        });
 
-        function updateLogo(imageObject) {
-            if (decalMaterials.length === 0) return;
-            const canvasSize = 1024;
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvasSize;
-            canvas.height = canvasSize;
-            const maxDimension = canvasSize * 0.8;
-            const imageAspect = imageObject.naturalWidth / imageObject.naturalHeight;
-            let destWidth, destHeight;
-            if (imageAspect > 1) {
-                destWidth = maxDimension;
-                destHeight = maxDimension / imageAspect;
-            } else {
-                destHeight = maxDimension;
-                destWidth = maxDimension * imageAspect;
-            }
-            const destX = (canvasSize - destWidth) / 2;
-            const destY = (canvasSize - destHeight) / 2;
-            ctx.drawImage(imageObject, destX, destY, destWidth, destHeight);
-            const newTexture = new THREE.CanvasTexture(canvas);
-            newTexture.colorSpace = THREE.SRGBColorSpace;
-            newTexture.flipY = false;
-            newTexture.needsUpdate = true;
-            decalMaterials.forEach(material => {
-                if (material.map) material.map.dispose();
-                material.map = newTexture.clone();
-                material.needsUpdate = true;
-            });
-        }
-
-        function onWindowResize() {
-            if (camera) {
-                camera.aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
-                camera.updateProjectionMatrix();
-            }
-            renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
-        }
-
+        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            if (controls) controls.update();
-            if (scene && camera) renderer.render(scene, camera);
+            controls.update();
+            renderer.render(scene, camera);
         }
-
-        const form = document.getElementById('customization-form');
-        const colorPicker = document.getElementById('color-picker');
-        const hexInput = document.getElementById('hex-input');
-        const logoUpload = document.getElementById('logo-upload');
-        const errorMessage = document.getElementById('error-message');
-        colorPicker.addEventListener('input', (e) => hexInput.value = e.target.value);
-        hexInput.addEventListener('input', (e) => {
-            if (/^#[0-9A-F]{6}$/i.test(e.target.value)) colorPicker.value = e.target.value;
-        });
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            errorMessage.textContent = '';
-            const color = hexInput.value;
-            const file = logoUpload.files[0];
-            updateColor(color);
-            if (file) {
-                if (file.type !== 'image/png') {
-                    errorMessage.textContent = 'Please upload a valid PNG file.';
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const image = new Image();
-                    image.onload = () => updateLogo(image);
-                    image.onerror = () => errorMessage.textContent = 'Could not read image file.';
-                    image.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        init();
+        animate();
     </script>
 
 </body>
