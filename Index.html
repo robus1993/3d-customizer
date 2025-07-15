@@ -57,6 +57,7 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ConvolutionShader } from 'three/addons/shaders/ConvolutionShader.js';
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
@@ -79,6 +80,39 @@
         renderer.setClearColor(0x000000, 0);
         container.appendChild(renderer.domElement);
 
+        // Modify ConvolutionShader for blur to handle alpha
+        ConvolutionShader.fragmentShader = /* glsl */`
+uniform sampler2D tDiffuse;
+uniform vec2 uImageIncrement;
+
+varying vec2 vUv;
+
+#define KERNEL_RADIUS 25
+uniform float sigma;
+
+float gaussianPdf(in float x, in float sigma) {
+    return 0.39894 * exp( -0.5 * x * x/( sigma * sigma))/sigma;
+}
+
+void main() {
+    float weightSum = gaussianPdf(0.0, sigma);
+    vec4 center = texture2D( tDiffuse, vUv );
+    vec3 diffuseSum = center.rgb * weightSum;
+    float alphaSum = center.a * weightSum;
+    for( int i = 1; i < KERNEL_RADIUS; i ++ ) {
+        float x = float(i);
+        float w = gaussianPdf(x, sigma);
+        vec2 uvOffset = uImageIncrement * x;
+        vec4 sample1 = texture2D( tDiffuse, vUv + uvOffset );
+        vec4 sample2 = texture2D( tDiffuse, vUv - uvOffset );
+        diffuseSum += (sample1.rgb + sample2.rgb) * w;
+        alphaSum += (sample1.a + sample2.a) * w;
+        weightSum += 2.0 * w;
+    }
+    gl_FragColor = vec4(diffuseSum / weightSum, alphaSum / weightSum);
+}
+`;
+
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
@@ -90,21 +124,42 @@
             threshold: 1
         };
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), bloomParams.strength, bloomParams.radius, bloomParams.threshold);
-        // Modify composite shader for transparency
-        bloomPass.compositeMaterial.fragmentShader = `
-            varying vec2 vUv;
-            uniform sampler2D baseTexture;
-            uniform sampler2D bloomTexture;
-            uniform float bloomFactor;
-            void main() {
-                vec4 base = texture2D( baseTexture, vUv );
-                vec4 bloom = texture2D( bloomTexture, vUv );
-                gl_FragColor.rgb = base.rgb + bloomFactor * bloom.rgb;
-                gl_FragColor.a = base.a;
-            }
-        `;
-        bloomPass.compositeMaterial.needsUpdate = true;
         composer.addPass(bloomPass);
+
+        // Modify high pass for alpha
+        bloomPass.materialHighPassFilter.fragmentShader = /* glsl */`
+uniform sampler2D tDiffuse;
+uniform float luminanceThreshold;
+uniform float luminanceSmoothing;
+
+varying vec2 vUv;
+
+void main() {
+    vec4 texel = texture2D( tDiffuse, vUv );
+    vec3 luma = vec3( 0.299, 0.587, 0.114 );
+    float v = dot( texel.xyz, luma );
+    float alpha = smoothstep( luminanceThreshold, luminanceThreshold + luminanceSmoothing, v );
+    gl_FragColor = vec4( texel.rgb * alpha, texel.a );
+}
+`;
+        bloomPass.materialHighPassFilter.needsUpdate = true;
+
+        // Modify composite for alpha
+        bloomPass.compositeMaterial.fragmentShader = /* glsl */`
+uniform sampler2D baseTexture;
+uniform sampler2D bloomTexture;
+uniform float bloomStrength;
+
+varying vec2 vUv;
+
+void main() {
+    vec4 base = texture2D( baseTexture, vUv );
+    vec4 bloom = texture2D( bloomTexture, vUv );
+    gl_FragColor.rgb = base.rgb + bloomStrength * bloom.rgb;
+    gl_FragColor.a = base.a;
+}
+`;
+        bloomPass.compositeMaterial.needsUpdate = true;
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -306,7 +361,6 @@
 
                 // Create shadow catcher plane
                 const box = new THREE.Box3().setFromObject(gltf.scene);
-                const minY = box.min.y;
                 const planeSize = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 2;
                 const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
                 const planeMat = new THREE.ShadowMaterial({ opacity: 0.5 });
