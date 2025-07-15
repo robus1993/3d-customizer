@@ -23,10 +23,13 @@
         <h2 class="text-2xl font-bold mb-4">Customize Product</h2>
         <div class="flex flex-col space-y-4">
             <div>
-                <label class="block mb-2">Product Color</label>
-                <input id="product-color" type="color" class="w-full h-10">
+                <label class="block mb-2">Primary Product Color</label>
+                <input id="primary-color" type="color" class="w-full h-10">
             </div>
-
+            <div>
+                <label class="block mb-2">Secondary Product Color</label>
+                <input id="secondary-color" type="color" class="w-full h-10">
+            </div>
             <div>
                 <label class="block mb-2">Upload Logo (.png)</label>
                 <input id="logo-upload" type="file" accept=".png" class="w-full">
@@ -60,7 +63,8 @@
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
-        const colorPicker = document.getElementById('product-color');
+        const primaryColorPicker = document.getElementById('primary-color');
+        const secondaryColorPicker = document.getElementById('secondary-color');
         const logoUpload = document.getElementById('logo-upload');
         const applyBtn = document.getElementById('apply-customization');
         const logBtn = document.getElementById('log-settings');
@@ -289,7 +293,8 @@
         const glbUrl = './scene-optimized.glb'; // Assuming the GLB file is in the same directory as index.html on your Netlify site
         const loader = new GLTFLoader();
         loader.setMeshoptDecoder(MeshoptDecoder);
-        let colorObjects = [];
+        let primaryColorObjects = [];
+        let secondaryColorObjects = [];
         let decalObjects = [];
         loader.load(
             glbUrl,
@@ -297,30 +302,33 @@
                 scene.add(gltf.scene);
 
                 // Identify objects and enable shadows
-                let floorMesh = null;
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                        if (child.name.startsWith('Color')) colorObjects.push(child);
-                        if (child.name.startsWith('Decal')) decalObjects.push(child);
-                        if (child.name === 'Floor') {
-                            floorMesh = child;
+                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color27'].includes(child.name)) {
+                            primaryColorObjects.push(child);
+                        } else if (['Color21', 'Color25', 'Color27'].includes(child.name)) {
+                            secondaryColorObjects.push(child);
                         }
+                        if (child.name.startsWith('Decal')) decalObjects.push(child);
                         child.castShadow = true;
                         child.receiveShadow = true;
                     }
                 });
 
-                // Setup floor as shadow catcher
-                if (floorMesh) {
-                    if (floorMesh.material.map) floorMesh.material.map.dispose(); // Dispose old texture if any
-                    floorMesh.material = new THREE.ShadowMaterial();
-                    floorMesh.material.opacity = 1; // Adjust for shadow strength
-                    floorMesh.receiveShadow = true;
-                    floorMesh.castShadow = false; // Floor doesn't cast shadows
-                }
+                // Create shadow catcher plane
+                const box = new THREE.Box3().setFromObject(gltf.scene);
+                const minY = box.min.y;
+                const planeSize = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 2;
+                const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+                const planeMat = new THREE.ShadowMaterial({ opacity: 0.5 });
+                const plane = new THREE.Mesh(planeGeo, planeMat);
+                plane.rotation.x = -Math.PI / 2;
+                plane.position.y = minY - 0.01;
+                plane.receiveShadow = true;
+                plane.castShadow = false;
+                scene.add(plane);
 
                 // Center the model
-                const box = new THREE.Box3().setFromObject(gltf.scene);
                 const center = box.getCenter(new THREE.Vector3());
                 controls.target.copy(center);
                 camera.lookAt(center);
@@ -336,11 +344,16 @@
         );
 
         // Customization logic
-        let selectedColor = new THREE.Color(colorPicker.value);
+        let primarySelectedColor = new THREE.Color(primaryColorPicker.value);
+        let secondarySelectedColor = new THREE.Color(secondaryColorPicker.value);
         let logoImageFile = null;
 
-        colorPicker.addEventListener('input', (e) => {
-            selectedColor.set(e.target.value);
+        primaryColorPicker.addEventListener('input', (e) => {
+            primarySelectedColor.set(e.target.value);
+        });
+
+        secondaryColorPicker.addEventListener('input', (e) => {
+            secondarySelectedColor.set(e.target.value);
         });
 
         logoUpload.addEventListener('change', (e) => {
@@ -348,9 +361,14 @@
         });
 
         applyBtn.addEventListener('click', () => {
-            // Apply color
-            colorObjects.forEach((mesh) => {
-                mesh.material.color.set(selectedColor);
+            // Apply primary color
+            primaryColorObjects.forEach((mesh) => {
+                mesh.material.color.set(primarySelectedColor);
+            });
+
+            // Apply secondary color
+            secondaryColorObjects.forEach((mesh) => {
+                mesh.material.color.set(secondarySelectedColor);
             });
 
             // Apply logo
