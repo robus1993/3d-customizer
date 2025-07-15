@@ -57,7 +57,6 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 
         const container = document.getElementById('three-container');
         const loadingDiv = document.getElementById('loading');
@@ -69,19 +68,22 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(-0.2840329107436267, 1.4382243402279846, 10.275912849022538);
-        camera.rotation.set(0.00101810946737628, -0.021709860116203898, 0.00002210128553521455);
+        camera.position.set(-0.3674531894270703, 1.4382243402279844, 10.273768849592376);
+        camera.rotation.set(0.0010183180716188886, -0.02968115576813937, 0.000030220430066920483);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.setClearColor('#f0f0f0', 1);
+        renderer.setClearColor(0x000000, 0);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1;
         container.appendChild(renderer.domElement);
 
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
+        renderPass.clear = false;
         composer.addPass(renderPass);
 
         const bloomParams = {
@@ -92,21 +94,6 @@
         };
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), bloomParams.strength, bloomParams.radius, bloomParams.threshold);
         composer.addPass(bloomPass);
-
-        const ssaoParams = {
-            enabled: true,
-            kernelRadius: 16,
-            minDistance: 0.005,
-            maxDistance: 0.1,
-            intensity: 10 // Default intensity
-        };
-        const ssaoPass = new SSAOPass(scene, camera, container.clientWidth, container.clientHeight);
-        ssaoPass.kernelRadius = ssaoParams.kernelRadius;
-        ssaoPass.minDistance = ssaoParams.minDistance;
-        ssaoPass.maxDistance = ssaoParams.maxDistance;
-        ssaoPass.intensity = ssaoParams.intensity;
-        ssaoPass.enabled = ssaoParams.enabled;
-        composer.addPass(ssaoPass);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -270,16 +257,9 @@
         bloomFolder.add(bloomParams, 'radius', 0, 1, 0.01).onChange(v => bloomPass.radius = v);
         bloomFolder.add(bloomParams, 'threshold', 0, 1, 0.01).onChange(v => bloomPass.threshold = v);
 
-        const ssaoFolder = postFolder.addFolder('SSAO');
-        ssaoFolder.add(ssaoParams, 'enabled').onChange(v => ssaoPass.enabled = v);
-        ssaoFolder.add(ssaoParams, 'kernelRadius', 0, 32, 0.1).onChange(v => ssaoPass.kernelRadius = v);
-        ssaoFolder.add(ssaoParams, 'minDistance', 0, 0.1, 0.001).onChange(v => ssaoPass.minDistance = v);
-        ssaoFolder.add(ssaoParams, 'maxDistance', 0, 0.2, 0.001).onChange(v => ssaoPass.maxDistance = v);
-        ssaoFolder.add(ssaoParams, 'intensity', 0, 100, 1).onChange(v => ssaoPass.intensity = v);
-
         // Shadow catcher GUI
         const shadowCatcherParams = {
-            offset: -0.01
+            offset: 0.017
         };
         let shadowCatcherPlane = null;
         let modelMinY = 0;
@@ -303,9 +283,9 @@
                 // Identify objects and enable shadows
                 gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                        if (child.name.startsWith('Color') && !['Color21', 'Color25', '1'].includes(child.name)) {
+                        if (child.name.startsWith('Color') && !['Color21', 'Color25', 'Color277'].includes(child.name)) {
                             primaryColorObjects.push(child);
-                        } else if (['Color21', 'Color25', '1'].includes(child.name)) {
+                        } else if (['Color21', 'Color25', 'Color277'].includes(child.name)) {
                             secondaryColorObjects.push(child);
                         }
                         if (child.name.startsWith('Decal')) decalObjects.push(child);
@@ -435,8 +415,7 @@
                     } : {})
                 })),
                 postProcessing: {
-                    bloom: bloomParams,
-                    ssao: ssaoParams
+                    bloom: bloomParams
                 },
                 shadowCatcher: shadowCatcherParams
             };
