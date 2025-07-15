@@ -149,10 +149,10 @@
             ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
             scene.add(ambientLight);
 
-            // Create three initial point lights
-            lights.push(createLight('PointLight', 0xffffff, 5, new THREE.Vector3(5, 5, 5)));
-            lights.push(createLight('PointLight', 0xffe0b3, 5, new THREE.Vector3(-5, 5, 5)));
-            lights.push(createLight('PointLight', 0xb3e0ff, 5, new THREE.Vector3(0, 5, -5)));
+            // Create three initial point lights with corrected intensity
+            lights.push(createLight('PointLight', 0xffffff, 1000, new THREE.Vector3(5, 5, 5)));
+            lights.push(createLight('PointLight', 0xffe0b3, 1000, new THREE.Vector3(-5, 5, 5)));
+            lights.push(createLight('PointLight', 0xb3e0ff, 1000, new THREE.Vector3(0, 5, -5)));
             lights.forEach(light => scene.add(light));
             
             loadModel();
@@ -256,19 +256,17 @@
             ambientFolder.add(ambientLight, 'intensity', 0, 2, 0.01);
 
             // Punctual Light Controls
-            const lightParams = { type: 'PointLight' };
             lights.forEach((light, index) => {
                 const folder = gui.addFolder(`Light ${index + 1}`);
                 folder.add(light, 'visible');
                 folder.addColor(light, 'color');
-                folder.add(light, 'intensity', 0, 20, 0.1);
+                // Corrected intensity range for point lights
+                folder.add(light, 'intensity', 0, 4000, 10).name('Intensity');
                 
                 const posFolder = folder.addFolder('Position');
                 posFolder.add(light.position, 'x', -20, 20, 0.1);
                 posFolder.add(light.position, 'y', -20, 20, 0.1);
                 posFolder.add(light.position, 'z', -20, 20, 0.1);
-                
-                // Add more controls based on light type if needed in the future
             });
             
             // Log Settings Button
@@ -293,7 +291,8 @@
                         }))
                     };
                     console.log(JSON.stringify(settings, null, 2));
-                    alert('Settings logged to browser console (Press F12).');
+                    // Replaced alert with console log
+                    console.log('Settings have been logged to the browser console (Press F12).');
                 }
             };
             gui.add(settingsExporter, 'logSettings').name('Log Final Settings');
